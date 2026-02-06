@@ -1,31 +1,32 @@
-import { Container, Typography } from "@mui/material"
-import { useEffect } from "react"
+import { Container, Typography , Button } from "@mui/material"
+import { useState } from "react"
 
 function App() {
 
-  useEffect(() => {
-    fetch("/api/health")
-      .then((response) => {
-        console.log("Raw response:", response);
+  const [responseText , setResponseText] = useState("no response yet");
 
-        if (!response.ok) {
-          throw new Error(`HTTP error ${response.status}`);
-        }
+  function handleClick (){
+    fetch("/api/health/db")
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error("HTTP error " + res.status);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      setResponseText(JSON.stringify(data, null, 2));
+    })
+    .catch((err) => {
+      setResponseText("Request failed: " + err.message);
+    });
+  }
 
-        return response.json();
-      })
-      .then((data) => {
-        console.log("Parsed JSON:", data);
-      })
-      .catch((error) => {
-        console.error("Request failed:", error);
-      });
-  }, []);
 
   return (
     <Container sx={{ mt: 4 }}>
+      <Button variant="contained" onClick={handleClick}> Send http request</Button>
       <Typography variant="h4">
-        Open DevTools → Console
+        server response: {responseText}
       </Typography>
     </Container>
   )
