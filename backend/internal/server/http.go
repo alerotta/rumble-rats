@@ -1,12 +1,12 @@
 package server
 
 import (
-	"context"
 	"database/sql"
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/alerotta/rumble-rats/backend/internal/auth"
 )
 
 type App struct {
@@ -21,19 +21,23 @@ func NewApp(db *sql.DB) *App {
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health" , a.handleHealth)
-	mux.HandleFunc("/matchmaking", a.handleMatchmaking)
-	mux.HandleFunc("/health/db", a.handleHealthDB)
+	authHandler := auth.NewHandler(a.DB)
+	mux.Handle("/auth/register", authHandler.Register())
+	//mux.HandleFunc("/health" , a.handleHealth)
+	//mux.HandleFunc("/matchmaking", a.handleMatchmaking)
+	//mux.HandleFunc("/health/db", a.handleHealthDB)
 
 	return devCORS(requestLogger(mux))
 }
 
+/*
+
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, JSON{"error": "method not allowed"})
+		utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, JSON{
+	utils.WriteJSON(w, http.StatusOK, JSON{
 		"status": "ok",
 		"time":   time.Now().UTC().Format(time.RFC3339),
 	})
@@ -42,7 +46,7 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleMatchmaking(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, JSON{"error": "method not allowed"})
+		utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -51,7 +55,7 @@ func (a *App) handleMatchmaking(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
-	writeJSON(w, http.StatusOK, JSON{
+	utils.WriteJSON(w, http.StatusOK, JSON{
 		"status": "queued",
 		"mode":   body.Mode,
 	})
@@ -88,13 +92,9 @@ func (a *App) handleHealthDB( w http.ResponseWriter, r *http.Request){
 
 }
 
-// helper functions
+*/
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
+
 
 func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

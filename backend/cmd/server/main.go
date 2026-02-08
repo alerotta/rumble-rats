@@ -9,11 +9,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"github.com/alerotta/rumble-rats/backend/internal/db"
 	"github.com/alerotta/rumble-rats/backend/internal/server"
 )
 
 func main (){
+
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env file found, relying on environment variables")
+	}
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {

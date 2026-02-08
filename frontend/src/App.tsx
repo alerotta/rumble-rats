@@ -1,10 +1,15 @@
-import { Container, Typography , Button } from "@mui/material"
-import { useState } from "react"
+//import { Container, Typography , Button } from "@mui/material"
+//import { useState } from "react"
+import { Routes, Route } from "react-router-dom"
+import RegisterPage from "./pages/Register"
+
 
 function App() {
 
+  /*
   const [responseText , setResponseText] = useState("no response yet");
 
+  
   function handleClick (){
     fetch("/api/health/db")
     .then((res) => {
@@ -20,15 +25,25 @@ function App() {
       setResponseText("Request failed: " + err.message);
     });
   }
+  
 
 
   return (
+    
     <Container sx={{ mt: 4 }}>
       <Button variant="contained" onClick={handleClick}> Send http request</Button>
       <Typography variant="h4">
         server response: {responseText}
       </Typography>
     </Container>
+  )
+
+  */
+
+  return (
+    <Routes>
+      <Route path="/" element = {<RegisterPage/>} />
+    </Routes>
   )
 }
 
