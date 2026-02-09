@@ -24,6 +24,11 @@ func main (){
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 	log.Fatal("DATABASE_URL is not set")
+	}
+
+	s := os.Getenv("JWT_SECRET")
+	if s == ""{
+	log.Fatal("JWT_SECRET is not set")
 }
 	dbConn, err := db.Open(dsn)
 	if err != nil {
@@ -31,7 +36,7 @@ func main (){
 	}
 	defer dbConn.Close()
 
-	app := server.NewApp(dbConn)
+	app := server.NewApp(dbConn, s)
 	srv := &http.Server{
 		Addr: ":8080",
 		Handler: app.Routes(),

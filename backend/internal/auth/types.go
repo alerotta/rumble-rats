@@ -6,8 +6,17 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 }
 
-type RegisterResponse struct {
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 
+type AuthResponse struct {
+	Username string `json:"username"`
+	Token string `json:"token"`
+}
+
+type RegisterResponse struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 }

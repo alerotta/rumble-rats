@@ -3,7 +3,9 @@ package auth
 import "errors"
 
 var (
-	ErrConflict = errors.New("conflict")
+	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserNotFound = errors.New("user not found")
+	
 	ErrNotFound   = errors.New("not found") 
 	ErrUnauthorized = errors.New("unauthorized")
 )

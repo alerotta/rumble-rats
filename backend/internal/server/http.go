@@ -11,88 +11,27 @@ import (
 
 type App struct {
 	DB *sql.DB
+	jwtSecret string
 }
 
-func NewApp(db *sql.DB) *App {
+func NewApp(db *sql.DB, JWT string) *App {
 	return &App{
 		DB: db,
+		jwtSecret: JWT,
 	}
 }
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
-	authHandler := auth.NewHandler(a.DB)
+	authHandler := auth.NewHandler(a.DB, a.jwtSecret)
 	mux.Handle("/auth/register", authHandler.Register())
+	mux.Handle("/auth/login", authHandler.Login())
 	//mux.HandleFunc("/health" , a.handleHealth)
 	//mux.HandleFunc("/matchmaking", a.handleMatchmaking)
 	//mux.HandleFunc("/health/db", a.handleHealthDB)
 
 	return devCORS(requestLogger(mux))
 }
-
-/*
-
-func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	utils.WriteJSON(w, http.StatusOK, JSON{
-		"status": "ok",
-		"time":   time.Now().UTC().Format(time.RFC3339),
-	})
-}
-
-func (a *App) handleMatchmaking(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodGet {
-		utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var body struct {
-		Mode string `json:"mode"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-
-	utils.WriteJSON(w, http.StatusOK, JSON{
-		"status": "queued",
-		"mode":   body.Mode,
-	})
-
-	
-}
-
-func (a *App) handleHealthDB( w http.ResponseWriter, r *http.Request){
-
-	if r.Method != http.MethodGet {
-	writeJSON(w, http.StatusMethodNotAllowed, JSON{"error": "method not allowed"})
-	return
-	}
-
-
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-
-	var now time.Time
-	err := a.DB.QueryRowContext(ctx, "SELECT now()").Scan(&now)
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, JSON{
-			"status": "error",
-			"error":  "database not reachable",
-		})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, JSON{
-		"status": "ok",
-		"db":     "connected",
-		"time":   now.UTC().Format(time.RFC3339),
-	})
-
-}
-
-*/
 
 
 
