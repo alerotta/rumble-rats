@@ -29,32 +29,37 @@ func NewService(store *Store, jwtSecret string) *Service {
 	}
 }
 
-func (s *Service) Register(ctx context.Context , req RegisterRequest) (RegisterResponse, error){
+func (s *Service) Register(ctx context.Context , req RegisterRequest) (AuthResponse, error){
 	
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	if req.Username == "" || req.Email == "" || req.Password == "" {
-		return RegisterResponse{}, ErrValidation("username, email and password are required")
+		return AuthResponse{}, ErrValidation("username, email and password are required")
 	}
 	if len(req.Password) < 8 {
-		return RegisterResponse{}, ErrValidation("password must be at least 8 characters")
+		return AuthResponse{}, ErrValidation("password must be at least 8 characters")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return RegisterResponse{}, fmt.Errorf("bcrypt generate hash: %w", err)
+		return AuthResponse{}, fmt.Errorf("bcrypt generate hash: %w", err)
 	}
 
 	user, err := s.store.CreateUser(ctx, req.Username, req.Email, string(hash))
 		if err != nil {
 		if errors.Is(err, ErrUserAlreadyExists) {
-			return RegisterResponse{}, err
+			return AuthResponse{}, err
 		}
-		return RegisterResponse{}, fmt.Errorf("create user: %w", err)
+		return AuthResponse{}, fmt.Errorf("create user: %w", err)
 	}
 
-	return RegisterResponse{Username: user.Username, Email: user.Email}, nil
+	token, err := s.signAccessToken(user.Username) 
+	if err != nil {
+		return AuthResponse{}, fmt.Errorf("sign access token: %w", err)
+	}
+
+	return AuthResponse{Username: user.Username, Token: token}, nil
 	
 }
 
@@ -95,15 +100,45 @@ func (s *Service) Login(ctx context.Context , req LoginRequest) (AuthResponse, e
 
 }
 
+func (s *Service) ValidateAccessToken (tokenString string) (*jwt.RegisteredClaims, error){
+
+	claims := &jwt.RegisteredClaims{}
+
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		claims,
+		func (t *jwt.Token)(any,error){
+			if t.Method != jwt.SigningMethodHS256{
+				return nil , fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return s.jwtSecret, nil
+		},
+		jwt.WithIssuer(s.issuer),
+		jwt.WithAudience(s.audience),
+		jwt.WithLeeway(30*time.Second),
+	)
+	if err != nil {
+		return nil, err // includes expired, bad sig, malformed, wrong iss/aud, etc.
+	}
+	if !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+
+	if claims.Subject == "" {
+		return nil, errors.New("missing sub")
+	}
+	return claims, nil
+}
+
 func (s *Service) signAccessToken (username string)(string ,error){
 	now := time.Now()
 
 		claims := jwt.MapClaims{                
 		"sub": username,               
-		"iss":      s.issuer,               
-		"aud":      s.audience,             
-		"iat":      now.Unix(),             
-		"exp":      now.Add(s.accessTTL).Unix(), 
+		"iss": s.issuer,               
+		"aud": s.audience,             
+		"iat": now.Unix(),             
+		"exp": now.Add(s.accessTTL).Unix(), 
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

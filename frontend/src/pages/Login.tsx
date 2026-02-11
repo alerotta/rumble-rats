@@ -29,7 +29,7 @@ export default function LoginPage (){
             setLoading(false)
         }
 
-    }
+    }        
     
 
     return (
@@ -39,6 +39,7 @@ export default function LoginPage (){
             </Typography>
 
                   {error && (<Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> )}
+
             <Box component="form" onSubmit={onSubmit} sx={{ display: "grid", gap: 2 }} >
 
             <TextField

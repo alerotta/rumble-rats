@@ -1,42 +1,5 @@
-export type RegisterRequest = {
-    username : string
-    email: string 
-    password: string
-}
-
-export type LoginRequest = {
-    username : string
-    password: string
-}
-
-export type AuthResponse = {
-    username : string
-    accessToken : string
-}
-
-let accessToken: string | null = null
-let username: string | null = null
-
-export function getAccessToken() {
-  return accessToken
-}
-
-export function getUsername() {
-  return username
-}
-
-function setSession(data: AuthResponse) {
-  accessToken = data.accessToken
-  username = data.username
-}
-/*
-function clearSession() {
-  accessToken = null
-  username = null
-}
-*/
-
-
+import { setSession } from "./session"
+import type { RegisterRequest, LoginRequest, AuthResponse } from "./types"
 
 
 export async function register(payload: RegisterRequest): Promise <AuthResponse>{

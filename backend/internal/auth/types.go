@@ -16,7 +16,6 @@ type AuthResponse struct {
 	Token string `json:"token"`
 }
 
-type RegisterResponse struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+type VerifyTokenRequest struct {
+	Token string `json:"token"`
 }

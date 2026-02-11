@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -15,9 +14,7 @@ type Handler struct {
 	svc *Service
 }
 
-func NewHandler(db *sql.DB, jwtSecret string) *Handler {
-	store := NewStore(db)
-	svc := NewService(store,jwtSecret)
+func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
@@ -27,6 +24,10 @@ func (h *Handler) Register() http.Handler {
 
 func (h *Handler) Login() http.Handler {
 	return http.HandlerFunc(h.handleLogin)
+}
+
+func(h *Handler) Validate() http.Handler {
+	return http.HandlerFunc(h.handleValidation)
 }
 
 func (h* Handler) handleRegister (w http.ResponseWriter, r *http.Request){
@@ -106,6 +107,38 @@ func (h* Handler) handleLogin (w http.ResponseWriter, r *http.Request){
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp)
+
+}
+
+func (h* Handler) handleValidation (w http.ResponseWriter, r *http.Request){
+	if r.Method != http.MethodPost {
+	utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req VerifyTokenRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&req); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	if req.Token == "" {
+		utils.WriteError(w, http.StatusBadRequest, "token required")
+		return
+	}
+
+	if _, err := h.svc.ValidateAccessToken(req.Token); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, map[string]any{
+		"valid": true,
+	})
 
 }
 

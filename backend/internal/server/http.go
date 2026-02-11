@@ -23,12 +23,25 @@ func NewApp(db *sql.DB, JWT string) *App {
 
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
-	authHandler := auth.NewHandler(a.DB, a.jwtSecret)
+
+	store := auth.NewStore(a.DB)
+	svc := auth.NewService(store, a.jwtSecret)
+	authHandler := auth.NewHandler(svc)
+
+	//public routes
 	mux.Handle("/auth/register", authHandler.Register())
 	mux.Handle("/auth/login", authHandler.Login())
-	//mux.HandleFunc("/health" , a.handleHealth)
-	//mux.HandleFunc("/matchmaking", a.handleMatchmaking)
-	//mux.HandleFunc("/health/db", a.handleHealthDB)
+	mux.Handle("/auth/validate", authHandler.Validate())
+
+	//protected routes
+	
+	requireAuth := RequireAuth(svc)
+	mux.Handle("/me", requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"ok":true}`))
+	})))
+	
 
 	return devCORS(requestLogger(mux))
 }
