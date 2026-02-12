@@ -7,6 +7,7 @@ export async function register(payload: RegisterRequest): Promise <AuthResponse>
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        credentials: "include",
     })
 
     if (!res.ok){
@@ -30,6 +31,7 @@ export async function login(payload: LoginRequest): Promise <AuthResponse>{
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        credentials: "include",
     })
 
     if (!res.ok){
@@ -46,5 +48,17 @@ export async function login(payload: LoginRequest): Promise <AuthResponse>{
     const data = (await res.json()) as AuthResponse
     setSession(data)
     return data
+}
+
+// to be completed
+
+export async function refresh() {
+  const res = await fetch("/api/auth/refresh", {
+    method: "POST",
+    credentials: "include", 
+  })
+
+  if (!res.ok) throw new Error("refresh failed")
+  return res.json() 
 }
 

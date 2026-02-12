@@ -5,9 +5,9 @@ import "errors"
 var (
 	ErrUserAlreadyExists = errors.New("user already exists")
 	ErrUserNotFound = errors.New("user not found")
-	
 	ErrNotFound   = errors.New("not found") 
 	ErrUnauthorized = errors.New("unauthorized")
+	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 )
 
 type ValidationError struct{ Msg string }

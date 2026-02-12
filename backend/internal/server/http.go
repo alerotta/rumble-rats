@@ -31,7 +31,8 @@ func (a *App) Routes() http.Handler {
 	//public routes
 	mux.Handle("/auth/register", authHandler.Register())
 	mux.Handle("/auth/login", authHandler.Login())
-	mux.Handle("/auth/validate", authHandler.Validate())
+	mux.Handle("/auth/refresh", authHandler.Refresh())
+	
 
 	//protected routes
 	

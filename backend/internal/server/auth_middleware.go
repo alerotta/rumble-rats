@@ -29,7 +29,13 @@ func RequireAuth(svc *auth.Service) func (http.Handler) http.Handler {
 				return
 			}
 
-			if _, err := svc.ValidateAccessToken(token); err != nil {
+			claims , err := svc.ValidateToken(token)
+			if err != nil {
+				utils.WriteError(w, http.StatusUnauthorized, "invalid token")
+				return
+			}
+
+			if claims.Type != "access"{
 				utils.WriteError(w, http.StatusUnauthorized, "invalid token")
 				return
 			}

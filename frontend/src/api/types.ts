@@ -9,7 +9,12 @@ export type LoginRequest = {
   password: string
 }
 
+export type RefreshRequest = {
+  refreshToken: string
+}
+
 export type AuthResponse = {
   token: string
   username: string
 }
+

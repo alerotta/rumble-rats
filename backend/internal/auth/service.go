@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +18,7 @@ type Service struct {
 	issuer string
 	audience  string
 	accessTTL time.Duration
+	refreshTTL time.Duration
 }
 
 func NewService(store *Store, jwtSecret string) *Service {
@@ -26,59 +28,66 @@ func NewService(store *Store, jwtSecret string) *Service {
 		issuer:    "rumble-rats",
 		audience:  "rumble-rats-web",
 		accessTTL: 15 * time.Minute,
+		refreshTTL: 4 * time.Hour,
 	}
 }
 
-func (s *Service) Register(ctx context.Context , req RegisterRequest) (AuthResponse, error){
+func (s *Service) Register(ctx context.Context , req RegisterRequest) (AuthResponse,RefreshToken, error){
 	
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	if req.Username == "" || req.Email == "" || req.Password == "" {
-		return AuthResponse{}, ErrValidation("username, email and password are required")
+		return AuthResponse{},RefreshToken{}, ErrValidation("username, email and password are required")
 	}
 	if len(req.Password) < 8 {
-		return AuthResponse{}, ErrValidation("password must be at least 8 characters")
+		return AuthResponse{},RefreshToken{}, ErrValidation("password must be at least 8 characters")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return AuthResponse{}, fmt.Errorf("bcrypt generate hash: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("bcrypt generate hash: %w", err)
 	}
 
 	user, err := s.store.CreateUser(ctx, req.Username, req.Email, string(hash))
 		if err != nil {
 		if errors.Is(err, ErrUserAlreadyExists) {
-			return AuthResponse{}, err
+			return AuthResponse{},RefreshToken{}, err
 		}
-		return AuthResponse{}, fmt.Errorf("create user: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("create user: %w", err)
 	}
 
 	token, err := s.signAccessToken(user.Username) 
 	if err != nil {
-		return AuthResponse{}, fmt.Errorf("sign access token: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("sign access token: %w", err)
 	}
 
-	return AuthResponse{Username: user.Username, Token: token}, nil
+	refreshToken , exp , err := s.signRefreshToken(req.Username)
+	if err != nil {
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("sign refresh token: %w", err)
+	}
+
+
+	return AuthResponse{Username: user.Username, Token: token},RefreshToken{refreshToken,exp}, nil
 	
 }
 
-func (s *Service) Login(ctx context.Context , req LoginRequest) (AuthResponse, error){
+func (s *Service) Login(ctx context.Context , req LoginRequest) (AuthResponse,RefreshToken, error){
 
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		return AuthResponse{}, ErrValidation("username, password are required")
+		return AuthResponse{},RefreshToken{}, ErrValidation("username, password are required")
 	}
 	if len(req.Password) < 8 {
-		return AuthResponse{}, ErrValidation("password must be at least 8 characters")
+		return AuthResponse{},RefreshToken{}, ErrValidation("password must be at least 8 characters")
 	}
 
 	stored, err := s.store.GetPasswordHashByUsername(ctx, req.Username)
 		if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			return AuthResponse{}, ErrUnauthorized
+			return AuthResponse{},RefreshToken{}, ErrUnauthorized
 		}
-		return AuthResponse{}, fmt.Errorf("get password hash: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("get password hash: %w", err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword(
@@ -86,23 +95,48 @@ func (s *Service) Login(ctx context.Context , req LoginRequest) (AuthResponse, e
 		[]byte(req.Password),
 		); err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return AuthResponse{}, ErrUnauthorized
+			return AuthResponse{},RefreshToken{}, ErrUnauthorized
 		}
-		return AuthResponse{}, fmt.Errorf("bcrypt compare: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("bcrypt compare: %w", err)
 	}
 
-	token, err := s.signAccessToken(req.Username) 
+	accessToken, err := s.signAccessToken(req.Username) 
 	if err != nil {
-		return AuthResponse{}, fmt.Errorf("sign access token: %w", err)
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("sign access token: %w", err)
 	}
 
-	return AuthResponse{Username: req.Username , Token: token}, nil
+	refreshToken , exp , err := s.signRefreshToken(req.Username)
+	if err != nil {
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("sign refresh token: %w", err)
+	}
+
+
+	return AuthResponse{Username: req.Username , Token: accessToken },RefreshToken{refreshToken,exp}, nil
 
 }
 
-func (s *Service) ValidateAccessToken (tokenString string) (*jwt.RegisteredClaims, error){
+func (s *Service) Refresh(ctx context.Context,req RefreshRequest )(AuthResponse,RefreshToken, error){
 
-	claims := &jwt.RegisteredClaims{}
+	claims , err :=s.ValidateToken(req.RefreshToken)
+	if err != nil {
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("invalid refresh token: %w", err)
+	}
+	if claims.Type != "refresh" {
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("invalid refresh token: %w", err)
+	}
+	newAccessToken, err := s.signAccessToken(claims.Subject) 
+	if err != nil {
+		return AuthResponse{},RefreshToken{}, fmt.Errorf("sign access token: %w", err)
+	}
+
+	return AuthResponse{Username: claims.Subject , Token: newAccessToken },RefreshToken{}, nil
+
+}
+// helper functions TODO: move away  
+
+func (s *Service) ValidateToken (tokenString string) (*CustomClaims, error){
+
+	claims := &CustomClaims{}
 
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -118,7 +152,7 @@ func (s *Service) ValidateAccessToken (tokenString string) (*jwt.RegisteredClaim
 		jwt.WithLeeway(30*time.Second),
 	)
 	if err != nil {
-		return nil, err // includes expired, bad sig, malformed, wrong iss/aud, etc.
+		return nil, err 
 	}
 	if !token.Valid {
 		return nil, errors.New("invalid token")
@@ -127,20 +161,45 @@ func (s *Service) ValidateAccessToken (tokenString string) (*jwt.RegisteredClaim
 	if claims.Subject == "" {
 		return nil, errors.New("missing sub")
 	}
+
+	if claims.Type == "" {
+		return nil, errors.New("missing token type")
+	}
 	return claims, nil
 }
 
 func (s *Service) signAccessToken (username string)(string ,error){
 	now := time.Now()
 
-		claims := jwt.MapClaims{                
+	claims := jwt.MapClaims{                
 		"sub": username,               
 		"iss": s.issuer,               
 		"aud": s.audience,             
 		"iat": now.Unix(),             
-		"exp": now.Add(s.accessTTL).Unix(), 
+		"exp": now.Add(s.accessTTL).Unix(),
+		"typ": "access" ,
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return tok.SignedString(s.jwtSecret)
+}
+
+func (s *Service) signRefreshToken (username string)(string,time.Time,error){
+	now := time.Now()
+	exp := now.Add(s.refreshTTL)
+	claims := jwt.MapClaims{
+		"sub": username,               
+		"iss": s.issuer,               
+		"aud": s.audience,  
+		"iat": now.Unix(),
+		"exp": exp.Unix(),
+		"typ": "refresh",
+		}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	signedToken, err := tok.SignedString(s.jwtSecret)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return signedToken, exp, nil
 }
